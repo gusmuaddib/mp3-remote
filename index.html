@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart MP3 Remote</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 20px; }
+        .btn { background: #1db954; border: none; color: white; padding: 20px; margin: 10px; border-radius: 50%; width: 80px; height: 80px; font-size: 20px; cursor: pointer; }
+        .btn:active { background: #1ed760; }
+        .vol-slider { width: 80%; margin: 30px 0; }
+        #status { color: #888; font-size: 14px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>MP3 Controller</h1>
+    <div id="status">Disconnected</div>
+    <button class="btn" onclick="connect()">🔗</button>
+    <hr>
+    <div>
+        <button class="btn" onclick="sendCmd('P')">⏮</button>
+        <button class="btn" onclick="sendCmd('S')">⏯</button>
+        <button class="btn" onclick="sendCmd('N')">⏭</button>
+    </div>
+    <h3>Volume</h3>
+    <input type="range" min="0" max="30" value="15" class="vol-slider" onchange="sendVol(this.value)">
+
+    <script>
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const VOL_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        const CMD_CHAR_UUID = "cba1d466-344c-4be3-ab3f-189f80dd7518";
+
+        let device, cmdChar, volChar;
+
+        async function connect() {
+            try {
+                document.getElementById('status').innerText = "Searching...";
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Smart MP3 Player' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                cmdChar = await service.getCharacteristic(CMD_CHAR_UUID);
+                volChar = await service.getCharacteristic(VOL_CHAR_UUID);
+                document.getElementById('status').innerText = "Connected!";
+            } catch (e) { console.log(e); document.getElementById('status').innerText = "Error: " + e; }
+        }
+
+        async function sendCmd(c) {
+            if (cmdChar) {
+                const encoder = new TextEncoder();
+                await cmdChar.writeValue(encoder.encode(c));
+            }
+        }
+
+        async function sendVol(v) {
+            if (volChar) {
+                await volChar.writeValue(Uint8Array.of(v));
+            }
+        }
+    </script>
+</body>
+</html>
