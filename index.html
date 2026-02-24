@@ -9,6 +9,11 @@
         .btn:active { background: #1ed760; }
         .vol-slider { width: 80%; margin: 30px 0; }
         #status { color: #888; font-size: 14px; margin-bottom: 20px; }
+        
+        /* Message Field Styling */
+        .msg-container { margin-top: 30px; background: #282828; padding: 20px; border-radius: 15px; }
+        input[type="text"] { padding: 12px; border-radius: 5px; border: none; width: 70%; font-size: 16px; }
+        .send-btn { background: #1db954; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -16,34 +21,51 @@
     <div id="status">Disconnected</div>
     <button class="btn" onclick="connect()">🔗</button>
     <hr>
+    
     <div>
         <button class="btn" onclick="sendCmd('P')">⏮</button>
         <button class="btn" onclick="sendCmd('S')">⏯</button>
         <button class="btn" onclick="sendCmd('N')">⏭</button>
     </div>
+
     <h3>Volume</h3>
     <input type="range" min="0" max="30" value="15" class="vol-slider" onchange="sendVol(this.value)">
+
+    <div class="msg-container">
+        <h3>Send Message to LCD</h3>
+        <input type="text" id="msgInput" placeholder="Type something..." maxlength="50">
+        <br>
+        <button class="send-btn" onclick="sendMsg()">SEND TO DEVICE</button>
+    </div>
 
     <script>
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const VOL_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
         const CMD_CHAR_UUID = "cba1d466-344c-4be3-ab3f-189f80dd7518";
+        const MSG_CHAR_UUID = "d9d06e2c-3520-424a-874f-409b55580632"; // Matching your ESP32 code
 
-        let device, cmdChar, volChar;
+        let device, cmdChar, volChar, msgChar;
 
         async function connect() {
             try {
                 document.getElementById('status').innerText = "Searching...";
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'Smart MP3 Player' }],
+                    acceptAllDevices: true,
                     optionalServices: [SERVICE_UUID]
                 });
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
+                
+                // Connect to all three characteristics
                 cmdChar = await service.getCharacteristic(CMD_CHAR_UUID);
                 volChar = await service.getCharacteristic(VOL_CHAR_UUID);
+                msgChar = await service.getCharacteristic(MESSAGE_CHAR_UUID);
+                
                 document.getElementById('status').innerText = "Connected!";
-            } catch (e) { console.log(e); document.getElementById('status').innerText = "Error: " + e; }
+            } catch (e) { 
+                console.log(e); 
+                document.getElementById('status').innerText = "Error: " + e; 
+            }
         }
 
         async function sendCmd(c) {
@@ -56,6 +78,18 @@
         async function sendVol(v) {
             if (volChar) {
                 await volChar.writeValue(Uint8Array.of(v));
+            }
+        }
+
+        async function sendMsg() {
+            const text = document.getElementById('msgInput').value;
+            if (msgChar && text) {
+                const encoder = new TextEncoder();
+                // Send the text as a byte array
+                await msgChar.writeValue(encoder.encode(text));
+                document.getElementById('msgInput').value = ""; // Clear box after sending
+            } else if (!msgChar) {
+                alert("Connect to the device first!");
             }
         }
     </script>
