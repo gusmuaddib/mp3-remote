@@ -52,7 +52,7 @@
             try {
                 document.getElementById('status').innerText = "Searching...";
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
+                    filters: [{ name: 'PalaciPlayer' }],
                     optionalServices: [SERVICE_UUID]
                 });
                 const server = await device.gatt.connect();
