@@ -43,6 +43,8 @@
         const VOL_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
         const CMD_CHAR_UUID = "cba1d466-344c-4be3-ab3f-189f80dd7518";
         const MSG_CHAR_UUID = "d9d06e2c-3520-424a-874f-409b55580632"; // Matching your ESP32 code
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
 
         let device, cmdChar, volChar, msgChar;
 
@@ -90,6 +92,32 @@
                 document.getElementById('msgInput').value = ""; // Clear box after sending
             } else if (!msgChar) {
                 alert("Connect to the device first!");
+            }
+        }
+
+        async function connect() {
+            try {
+                document.getElementById('status').innerText = "Searching...";
+                device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [SERVICE_UUID]
+                });
+        
+                const server = await device.gatt.connect();
+                await sleep(500); // Wait for connection to stabilize
+        
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                await sleep(500); // Wait for service to stabilize
+        
+                // Now find characteristics
+                cmdChar = await service.getCharacteristic(CMD_CHAR_UUID);
+                volChar = await service.getCharacteristic(VOL_CHAR_UUID);
+                msgChar = await service.getCharacteristic(MSG_CHAR_UUID);
+        
+                document.getElementById('status').innerText = "Connected!";
+            } catch (e) { 
+                console.log(e); 
+                document.getElementById('status').innerText = "Characteristic Error: Reset Bluetooth & Retry"; 
             }
         }
     </script>
