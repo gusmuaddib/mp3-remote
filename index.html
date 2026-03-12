@@ -1,72 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Smart MP3 Remote</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MP3 Remote">
+
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 20px; }
-        .btn { background: #1db954; border: none; color: white; padding: 20px; margin: 10px; border-radius: 50%; width: 80px; height: 80px; font-size: 20px; cursor: pointer; }
-        .btn:active { background: #1ed760; }
-        .vol-slider { width: 80%; margin: 30px 0; }
-        #status { color: #888; font-size: 14px; margin-bottom: 20px; }
+        :root {
+            --primary: #1db954; /* Spotify-style green */
+            --bg: #121212;
+            --surface: #282828;
+            --text: #ffffff;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            text-align: center; 
+            background: var(--bg); 
+            color: var(--text); 
+            padding: 40px 20px;
+            margin: 0;
+            user-select: none;
+        }
+
+        #status { color: #888; font-size: 14px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         
-        /* Message Field Styling */
-        .msg-container { margin-top: 30px; background: #282828; padding: 20px; border-radius: 15px; }
-        input[type="text"] { padding: 12px; border-radius: 5px; border: none; width: 70%; font-size: 16px; }
-        .send-btn { background: #1db954; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        .card { background: var(--surface); padding: 25px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+        .btn-circle { background: var(--primary); border: none; color: white; padding: 20px; margin: 10px; border-radius: 50%; width: 75px; height: 75px; font-size: 24px; cursor: pointer; transition: transform 0.1s; }
+        .btn-circle:active { transform: scale(0.9); background: #1ed760; }
+        .connect-btn { background: #444; border-radius: 30px; width: auto; padding: 10px 25px; font-size: 14px; margin-bottom: 30px; }
+
+        .vol-slider { width: 100%; height: 15px; border-radius: 10px; background: #555; outline: none; -webkit-appearance: none; margin: 20px 0; }
+        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 25px; height: 25px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+
+        input[type="text"] { 
+            background: #3e3e3e; border: 1px solid #555; color: white; padding: 15px; 
+            border-radius: 10px; width: 85%; font-size: 16px; margin-bottom: 15px; outline: none;
+        }
+        .send-btn { 
+            background: var(--primary); color: white; border: none; padding: 12px 30px; 
+            border-radius: 25px; font-weight: bold; cursor: pointer; width: 100%;
+        }
     </style>
 </head>
 <body>
-    <h1>MP3 Controller</h1>
-    <div id="status">Disconnected</div>
-    <button class="btn" onclick="connect()">🔗</button>
-    <hr>
-    
-    <div>
-        <button class="btn" onclick="sendCmd('P')">⏮</button>
-        <button class="btn" onclick="sendCmd('S')">⏯</button>
-        <button class="btn" onclick="sendCmd('N')">⏭</button>
+
+    <div id="status">Ready to Connect</div>
+    <button class="btn-circle connect-btn" onclick="connect()">CONNECT DEVICE</button>
+
+    <div class="card">
+        <div class="controls">
+            <button class="btn-circle" onclick="sendCmd('P')">⏮</button>
+            <button class="btn-circle" onclick="sendCmd('S')">⏯</button>
+            <button class="btn-circle" onclick="sendCmd('N')">⏭</button>
+        </div>
     </div>
 
-    <h3>Volume</h3>
-    <input type="range" min="0" max="30" value="15" class="vol-slider" onchange="sendVol(this.value)">
+    <div class="card">
+        <h3>Volume</h3>
+        <input type="range" min="0" max="30" value="15" class="vol-slider" onchange="sendVol(this.value)">
+    </div>
 
-    <div class="msg-container">
-        <h3>Send Message to LCD</h3>
-        <input type="text" id="msgInput" placeholder="Type something..." maxlength="50">
-        <br>
-        <button class="send-btn" onclick="sendMsg()">SEND TO DEVICE</button>
+    <div class="card">
+        <h3>LCD Message</h3>
+        <input type="text" id="msgInput" placeholder="Type a message..." maxlength="50">
+        <button class="send-btn" onclick="sendMsg()">SEND TO BOX</button>
     </div>
 
     <script>
-        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const VOL_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        const CMD_CHAR_UUID = "cba1d466-344c-4be3-ab3f-189f80dd7518";
-        const MSG_CHAR_UUID = "d9d06e2c-3520-424a-874f-409b55580632"; // Matching your ESP32 code
-        const sleep = ms => new Promise(res => setTimeout(res, ms));
-
+        // UUIDs MUST match Arduino code
+        const SERVICE_UUID  = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const CMD_CHAR_UUID  = "cba1d466-344c-4be3-ab3f-189f80dd7518";
+        const VOL_CHAR_UUID  = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        const MSG_CHAR_UUID  = "d9d06e2c-3520-424a-874f-409b55580632"
 
         let device, cmdChar, volChar, msgChar;
 
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
         async function connect() {
             try {
-                document.getElementById('status').innerText = "Searching...";
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'PalaciPlayer' }],
-                    optionalServices: [SERVICE_UUID]
-                });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
+                document.getElementById('status').innerText = "Scanning...";
                 
-                // Connect to all three characteristics
+                // Filter ensures ONLY your device appears in the list
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }]
+                });
+
+                document.getElementById('status').innerText = "Linking...";
+                const server = await device.gatt.connect();
+                await sleep(600); 
+
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                await sleep(300); 
+
+                // Load all characteristics
                 cmdChar = await service.getCharacteristic(CMD_CHAR_UUID);
                 volChar = await service.getCharacteristic(VOL_CHAR_UUID);
-                msgChar = await service.getCharacteristic(MESSAGE_CHAR_UUID);
+                msgChar = await service.getCharacteristic(MSG_CHAR_UUID);
                 
-                document.getElementById('status').innerText = "Connected!";
+                document.getElementById('status').innerText = "Connected";
+                document.querySelector('.connect-btn').style.background = "#1db954";
+                document.querySelector('.connect-btn').innerText = "ONLINE";
             } catch (e) { 
                 console.log(e); 
-                document.getElementById('status').innerText = "Error: " + e; 
+                document.getElementById('status').innerText = "Error Connecting"; 
             }
         }
 
@@ -84,41 +127,23 @@
         }
 
         async function sendMsg() {
-            const text = document.getElementById('msgInput').value;
+            const input = document.getElementById('msgInput');
+            const text = input.value;
             if (msgChar && text) {
                 const encoder = new TextEncoder();
-                // Send the text as a byte array
                 await msgChar.writeValue(encoder.encode(text));
-                document.getElementById('msgInput').value = ""; // Clear box after sending
+                input.value = ""; // Clear input after sending
             } else if (!msgChar) {
-                alert("Connect to the device first!");
+                alert("Please connect first!");
             }
         }
 
-        async function connect() {
-            try {
-                document.getElementById('status').innerText = "Searching...";
-                device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID]
-                });
-        
-                const server = await device.gatt.connect();
-                await sleep(500); // Wait for connection to stabilize
-        
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                await sleep(500); // Wait for service to stabilize
-        
-                // Now find characteristics
-                cmdChar = await service.getCharacteristic(CMD_CHAR_UUID);
-                volChar = await service.getCharacteristic(VOL_CHAR_UUID);
-                msgChar = await service.getCharacteristic(MSG_CHAR_UUID);
-        
-                document.getElementById('status').innerText = "Connected!";
-            } catch (e) { 
-                console.log(e); 
-                document.getElementById('status').innerText = "Characteristic Error: Reset Bluetooth & Retry"; 
-            }
+        // Auto-refresh UI if disconnected
+        if (device) {
+            device.addEventListener('gattserverdisconnected', () => {
+                document.getElementById('status').innerText = "Disconnected";
+                document.querySelector('.connect-btn').style.background = "#444";
+            });
         }
     </script>
 </body>
